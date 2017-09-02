@@ -1,0 +1,15 @@
+#+TITLE: git-exts
+#+AUTHOR: ChienYu Lin
+#+EMAIL: cy20lin@google.com
+#+STARTUP: showall
+
+Extra extensions for git.
+
+* Commands
+
+- [[./doc/git-snapshot.org][git-snapshot]] :: Create snapshots for current worktree, index or commit.
+- [[./doc/git-switch.org][git-switch]] :: Switch to branch while keeping worktree and index intact.
+
+* License
+
+  =git-exts= is licensed under GUN GPLv3

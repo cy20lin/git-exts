@@ -1,0 +1,16 @@
+#+TITLE: git-switch
+#+AUTHOR: ChienYu Lin
+#+EMAIL: cy20lin@google.com
+#+OPTIONS: toc:2
+#+STARTUP: showall
+
+Switch to branch while keeping *WORKTREE* and *INDEX* intact.
+
+* Usage
+
+  #+BEGIN_SRC sh
+  git-switch <branch> [--force]
+  #+END_SRC
+
+- Force switching even if not existing. *[NOT YET IMPLEMENTED]*
+  - Enable if =--force= is specified.

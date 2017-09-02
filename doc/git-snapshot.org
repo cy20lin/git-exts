@@ -1,0 +1,180 @@
+#+TITLE: git-snapshot
+#+AUTHOR: ChienYu Lin
+#+EMAIL: cy20lin@google.com
+#+OPTIONS: toc:2
+#+STARTUP: showall
+
+=git-snapshot= is a script that helps you save working-tree, index or
+commit into a snapshot branch, with auto grenerted commit message.
+
+It is useful when you want to save current working state, but don't
+want to commit the work ,that are not done yet into the branch
+you're working on.
+
+Like =git stash=, it saves your working state, but in different manners.
+=git-snapshot= creates a branch called =snapshot= (if not specified),
+and manipulates that branch accordingly. It is also possible to push
+the snapshot to remote and share your works with others.
+
+* Table of contents :TOC:
+- [[#usage][Usage]]
+  - [[#save-snapshot][Save snapshot]]
+  - [[#pop-apply-snapshot][Pop, apply snapshot]]
+  - [[#drop-snapshot][Drop snapshot]]
+  - [[#clear-snapshot][Clear snapshot]]
+  - [[#show-snapshot][Show snapshot]]
+- [[#commit-message-format][Commit message format]]
+  - [[#message-head][Message head]]
+  - [[#message-body][Message body]]
+    - [[#single-line-property][Single-line property]]
+    - [[#multi-line-property][Multi-line property]]
+  - [[#properties][Properties]]
+
+* Usage
+
+  #+BEGIN_SRC sh
+  git-snapshot <command> [options...]
+  # <command> := save | pop | apply | drop | clear | show | help
+  #+END_SRC
+
+** Save snapshot
+
+   Save a snapshot.
+
+   #+BEGIN_SRC sh
+  git-snapshot save [--worktree | --index | --commit] [--branch=<branch>] [--with(out)-empty-initial]
+   #+END_SRC
+
+   - Snapshot type
+     - Save current working tree snapshot if =--worktree= is specified
+     - Save current index snapshot if =--index= is specified
+     - Save current commit snapshot if =--commit= is specified
+   - Branch to save snapshot *[NOT YET IMPLEMENTED]*
+     - Specified by =--branch=<branch-name>=, defaults to =snapshot= branch
+   - Create an empty initial snapshot if no any existing snapshot. *[NOT YET IMPLEMENTED]*
+     - Enable when =--with-empty-initial= is specified
+     - Disable when =--without-empty-initial= is specified
+
+** Pop, apply snapshot
+
+   Pop or apply last snapshot. *[NOT YET IMPLEMENTED]*
+
+   #+BEGIN_SRC sh
+   git-snapshot pop   [--force] [--branch=<branch>]
+   git-snapshot apply [--force] [--branch=<branch>]
+   #+END_SRC
+
+** Drop snapshot
+
+   Drop last snapshot. *[NOT YET IMPLEMENTED]*
+
+   #+BEGIN_SRC sh
+  git-snapshot drop  [--branch=<branch>]
+   #+END_SRC
+
+** Clear snapshot
+
+   Clear all snapshot. *[NOT YET IMPLEMENTED]*
+
+   #+BEGIN_SRC sh
+  git-snapshot clear [--branch=<branch>]
+   #+END_SRC
+
+** Show snapshot
+
+   Show all sanpshots. *[NOT YET IMPLEMENTED]*
+
+   #+BEGIN_SRC sh
+   git-snapshot show  [--branch=<branch>]
+   #+END_SRC
+
+* Commit message format
+
+  For each snapshot, it would with a auto generated commit message.
+  The commit message is in the format describing below.
+
+** Message head
+
+   #+BEGIN_EXAMPLE
+   <snapshot-type> snapshot <hex-millisconds-since-epoch>
+   #+END_EXAMPLE
+
+   Where,
+
+   #+BEGIN_EXAMPLE
+   <snapshot-type> := Worktree | Index | Commit
+   #+END_EXAMPLE
+
+   For example,
+
+   #+BEGIN_EXAMPLE
+   Worktree snapshot 15e37f401ac
+   #+END_EXAMPLE
+
+** Message body
+
+   Message body contains properties about this snapshots.
+   Each property is a key-value pair with a =<property-key>= 
+   mapping to =<property-value>=, =<property-value>= may be 
+   either single-line or multi-line.
+
+*** Single-line property
+
+    It is simple, a =<key>= follows a semicolon and a *SPACE*
+    (space counts) than goes with a single-lined =<value>=.
+
+    Format:
+
+    #+BEGIN_EXAMPLE
+    <key>: <value>
+    #+END_EXAMPLE
+
+    For example:
+
+    #+BEGIN_EXAMPLE
+    Branch: master
+    #+END_EXAMPLE
+
+*** Multi-line property
+
+    For a property containing a multi-line value, with a line
+    count =N= right after the property key.
+
+    Note that there is *NO SPACE* between =<line-count>=
+    and semicolon.
+
+    #+BEGIN_EXAMPLE
+    <key>:<line-count=N>
+    <line1>
+    <line2>
+    <line3>
+    ...
+    <lineN>
+    #+END_EXAMPLE
+
+    For a multi-line property without line-count, its value
+    is the content of lines before the first empty line or
+    end-of-file (EOF).
+
+    #+BEGIN_EXAMPLE
+    <property-key>:
+    <non-empty-line1>
+    <non-empty-line2>
+    <non-empty-line3>
+    ...
+    <non-empty-lineN>
+    <end-of-property-with-empty-line-or-EOF-here>
+    #+END_EXAMPLE
+
+** Properties
+
+   | Property    | Description                                                     |
+   |-------------+-----------------------------------------------------------------|
+   | Date        | Human readable date.                                            |
+   | Type        | Snapshot type, may be =Worktree=, =Index= or =Commit=           |
+   | Status      | Status of current HEAD, may be =Unborn=, =Detached= or =Normal= |
+   | HEAD        | HEAD hash id at which is being snapshoted.                      |
+   | Branch      | Branch name of on which is being snapshoted.                    |
+   | Files       | Snapshoted files.                                               |
+   | MessageHead | Message-head of commit at HEAD that is being snapshoted.        |
+   | MessageBody | Message-body of commit at HEAD that is being snapshoted.        |

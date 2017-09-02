@@ -1,0 +1,211 @@
+#!/bin/sh
+# Copyright (C) 2017 ChienYu Lin
+
+# Author: ChienYu Lin <cy20lin@gmail.com>
+
+# This file is part of git-exts.
+
+# git-exts is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# git-exts is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with git-exts. If not, see <http://www.gnu.org/licenses/>.
+
+# Code:
+
+info() {
+    echo "${@}" 1>&2
+}
+
+git_ref() {
+    ( git symbolic-ref --short --quiet HEAD || git rev-parse HEAD ) 2>/dev/null
+}
+
+git_() {
+    echo git "${@}" 1>&2
+    test -z ${OPTIONS_dry_run+x} && git "${@}"
+}
+
+parse_options() {
+    for var in "${@}"
+    do
+        # Convert [opt] to [expr]
+        # [var]          => [expr]
+        # [--a]          => [a=]
+        # [--a=]         => [a='']
+        # ["--a=12 3"]   => [a='12 3']
+        # [-a]           => []
+        # [a]            => []
+        # expr=$(echo "${var}" | sed 's/--\(.*\)/\1/g ; t a; d ; :a ; s/\([^=]*\)=\(.*\)/\1=\x27\2\x27/g ; t b; s/..*/&=/g ; :b ;')
+        expr=$(echo "${var}" | sed '
+               s/--\(.*\)/\1/g ;
+               t a;
+               d;
+               :a;
+               s/\([^=]*\)=\(.*\)/\1=\x27\2\x27/g;
+               t b;
+               s/..*/&=/g;
+               :b;
+               /^[a-zA-Z0-9_]*=/t c;
+               s/[^a-zA-Z0-9_]/_/;
+               b b;
+               :c')
+        # evaluate if ${expr} is not empty
+        if ! test -z "${expr}"
+        then
+            # echo set "OPTIONS_${expr}"
+            eval "OPTIONS_${expr}"
+        fi
+    done
+}
+
+git_snapshot_save__setup() {
+    parse_options "${@}"
+
+    GIT_SNAPSHOT_TYPE=Worktree
+    ! test -z "${OPTIONS_index+exists}" && GIT_SNAPSHOT_TYPE=Index
+    ! test -z "${OPTIONS_commit+exists}" && GIT_SNAPSHOT_TYPE=Commit
+    ! test -z "${OPTIONS_worktree+exists}" && GIT_SNAPSHOT_TYPE=Worktree
+    GIT_SNAPSHOT_BRANCH="${OPTIONS_branch-snapshot}"
+    EMPTY_INITIAL="${OPTIONS_with_empty_initial-true}"
+    DRY_RUN="${OPTIONS_dry_run-false}"
+
+    HEAD_ID_SHORT="$(git rev-parse --short HEAD 2>/dev/null)"
+    HEAD_ID="$(git rev-parse HEAD 2>/dev/null)"
+    HEAD_BRANCH="$(git symbolic-ref --short HEAD 2>/dev/null)"
+    HEAD_BRANCH_REV="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+    # HEAD_SYMBOLIC_REF="$(git symbolic-ref HEAD 2>/dev/null)"
+    HEAD_PARENT_ID="$(git log --pretty=%P -n 1 2>/dev/null)"
+    GIT_DIR="$(git rev-parse --git-dir)"
+
+    if test -z "${GIT_DIR}"
+    then
+        HEAD_TYPE="NotARepo"
+        fatal "Not inside git repo."
+        exit 1
+    elif test "${HEAD_BRANCH_REV}" = "HEAD"
+    then
+        if test "${HEAD_ID}" = "HEAD"
+        then
+            HEAD_TYPE="Unborn"
+            test "${GIT_SNAPSHOT_TYPE}" = "Commit" && exit 1
+        else
+            HEAD_TYPE="Detached"
+        fi
+    else
+        HEAD_TYPE="Normal"
+    fi
+}
+
+git_snapshot_save__print_commit_message() {
+    TIME_STAMP="$(printf "%x" `date +%s%3N`)"
+    DATE="$(LANG=C date -R)"
+    echo "${GIT_SNAPSHOT_TYPE} snapshot ${TIME_STAMP} ${HEAD_ID_SHORT}"
+    echo
+    echo "Date: ${DATE}"
+    echo "Type: ${GIT_SNAPSHOT_TYPE}"
+    echo "HEAD: ${HEAD_ID}"
+    echo "Branch: ${HEAD_BRANCH}"
+    echo "Status: ${HEAD_TYPE}"
+    echo
+    printf "Files:\n"
+    git ls-files
+    echo
+}
+
+git_snapshot_save() {
+    git_snapshot_save__setup "${@}"
+
+    REF=$( ( git symbolic-ref --short --quiet HEAD || git rev-parse -q HEAD ) 2>/dev/null )
+    ANCHOR_Commit=$(git rev-parse HEAD 2>/dev/null)
+
+    git_ symbolic-ref HEAD "refs/heads/${GIT_SNAPSHOT_BRANCH}"
+
+    if git rev-parse --verify --quiet "${GIT_SNAPSHOT_BRANCH}"
+    then
+        git checkout --detach
+    else
+        git commit --allow-empty -m "Initial snapshot"
+        git checkout --detach
+        if "${EMPTY_INITIAL}" != true
+        then
+            git branch -D "${GIT_SNAPSHOT_BRANCH}"
+        fi
+    fi
+
+    git_ commit --allow-empty --allow-empty-message -m ""
+    ANCHOR_Index=$(git rev-parse HEAD 2>/dev/null)
+
+    if test "${GIT_SNAPSHOT_TYPE}" = "Worktree"
+    then
+        git_ rm --cached -rf .
+        git_ add --all
+        git_ commit --allow-empty --allow-empty-message -m ""
+        ANCHOR_Worktree=$(git rev-parse HEAD 2>/dev/null)
+    fi
+
+    # Set index to what we want to save
+    eval git_ reset --mixed "\"\${ANCHOR_${GIT_SNAPSHOT_TYPE}}\""
+
+    git_ symbolic-ref HEAD "refs/heads/${GIT_SNAPSHOT_BRANCH}"
+
+    # Commit
+    git_snapshot_save__print_commit_message | git_ commit --allow-empty -F-
+
+    git_ checkout --detach # Detach form current branch
+    git_ reset --mixed "${ANCHOR_Index}" # Reset Index
+    if test "${HEAD_TYPE}" = Unborn
+    then
+        git_ symbolic-ref HEAD "refs/heads/${REF}"
+    else
+        git_ reset --soft "${REF}" # Reset and checkout back
+        git_ checkout "${REF}"
+    fi
+}
+
+git_snapshot_pop() {
+    info "Work in progress."
+    exit 1
+}
+
+git_snapshot_apply() {
+    info "Work in progress."
+    exit 1
+}
+
+git_snapshot_clear() {
+    info "Work in progress."
+    exit 1
+}
+
+git_snapshot_show() {
+    info "Work in progress."
+    exit 1
+}
+
+git_snapshot_help() {
+    info "Work in progress."
+    exit 1
+}
+
+git_snapshot() {
+    command="${1}"
+    shift
+    case "${command}" in
+    save) git_snapshot_save "${@}" ;;
+    pop) git_snapshot_pop "${@}" ;;
+    apply) git_snapshot_apply "${@}" ;;
+    clear) git_snapshot_clear "${@}" ;;
+    show) git_snapshot_show "${@}" ;;
+    *) git_snapshot_help ;;
+    esac
+}
+
+git_snapshot "${@}"
